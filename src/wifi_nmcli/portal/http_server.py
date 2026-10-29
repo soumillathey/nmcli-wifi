@@ -39,10 +39,10 @@ class CaptiveHTTPServer:
             try:
                 self._server = PortalThreadingHTTPServer(("0.0.0.0", 8080), CaptivePortalHandler)
                 self.port = 8080
-                self._redirected = setup_port_forwarding(self.iface, 80, 8080)
             except (OSError, PermissionError) as e:
                 logger.error("Failed binding fallback port 8080: %s", e); return False
 
+        self._redirected = setup_port_forwarding(self.iface, self.port, 5353)
         self._thread = threading.Thread(target=self._server.serve_forever, name="CaptiveHTTP", daemon=True)
         self._thread.start()
         logger.info("Captive HTTP server running on port %d (iptables redirect=%s)", self.port, self._redirected)
@@ -50,7 +50,7 @@ class CaptiveHTTPServer:
 
     def stop(self) -> None:
         if self._redirected:
-            teardown_port_forwarding(self.iface, 80, 8080); self._redirected = False
+            teardown_port_forwarding(self.iface, self.port, 5353); self._redirected = False
         if self._server:
             try: self._server.shutdown(); self._server.server_close()
             except OSError: pass

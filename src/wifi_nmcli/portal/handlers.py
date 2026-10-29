@@ -11,12 +11,13 @@ from wifi_nmcli.nmcli.connection import connect_wifi, get_active_wifi_ssid
 from wifi_nmcli.nmcli.hotspot import is_hotspot_active
 from wifi_nmcli.nmcli.scanner import scan_networks
 
-_PROBES = {"/generate_204", "/gen_204", "/hotspot-detect.html", "/canonicalizer.ucs.ed.ac.uk", "/connecttest.txt", "/ncsi.txt"}
+_PROBES = {"/generate_204", "/gen_204", "/hotspot-detect.html", "/canonicalizer.ucs.ed.ac.uk", "/connecttest.txt", "/ncsi.txt", "/success.txt"}
 _LOCAL_HOSTS = {"10.42.0.1", "hermes.local", "localhost", "127.0.0.1"}
 
 
 class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None: pass
+    def do_HEAD(self) -> None: self.do_GET()
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path

@@ -23,13 +23,11 @@ class TestProbesAndHosts(unittest.TestCase):
 
     def test_ensure_local_domain(self) -> None:
         with tempfile.NamedTemporaryFile("w+", delete=False) as f:
-            f.write("127.0.0.1 localhost\n")
-            p = Path(f.name)
+            f.write("127.0.0.1 localhost\n"); p = Path(f.name)
         try:
             self.assertTrue(ensure_local_domain("hermes.local", ("127.0.0.1", "10.42.0.1"), hosts_path=p))
             txt = p.read_text()
-            self.assertIn("127.0.0.1\thermes.local", txt)
-            self.assertIn("10.42.0.1\thermes.local", txt)
+            self.assertIn("127.0.0.1\thermes.local", txt); self.assertIn("10.42.0.1\thermes.local", txt)
             self.assertTrue(ensure_local_domain("hermes.local", ("127.0.0.1", "10.42.0.1"), hosts_path=p))
         finally:
             p.unlink(missing_ok=True)
@@ -40,18 +38,14 @@ class TestProbesAndHosts(unittest.TestCase):
         opener = urllib.request.build_opener(NoRedirectHandler)
         try:
             for path in ("/generate_204", "/hotspot-detect.html"):
-                try:
-                    opener.open(f"http://127.0.0.1:{http_srv.port}{path}", timeout=3.0)
+                try: opener.open(f"http://127.0.0.1:{http_srv.port}{path}", timeout=3.0)
                 except urllib.error.HTTPError as e:
-                    self.assertEqual(e.code, 302)
-                    self.assertEqual(e.headers.get("Location"), "http://10.42.0.1/")
+                    self.assertEqual(e.code, 302); self.assertEqual(e.headers.get("Location"), "http://10.42.0.1/")
 
             req = urllib.request.Request(f"http://127.0.0.1:{http_srv.port}/some/path", headers={"Host": "connectivitycheck.gstatic.com"})
-            try:
-                opener.open(req, timeout=3.0)
+            try: opener.open(req, timeout=3.0)
             except urllib.error.HTTPError as e:
-                self.assertEqual(e.code, 302)
-                self.assertEqual(e.headers.get("Location"), "http://10.42.0.1/")
+                self.assertEqual(e.code, 302); self.assertEqual(e.headers.get("Location"), "http://10.42.0.1/")
         finally:
             http_srv.stop()
 

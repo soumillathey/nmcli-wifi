@@ -48,8 +48,8 @@ class TestCaptivePortal(unittest.TestCase):
     @patch("shutil.which", return_value="/sbin/iptables")
     @patch("wifi_nmcli.portal.redirect._run_cmd", return_value=True)
     def test_redirect_utilities(self, mock_cmd: patch, mock_which: patch) -> None:
-        self.assertTrue(setup_port_forwarding("wlan0", 80, 8080))
-        teardown_port_forwarding("wlan0", 80, 8080); kill_stale_portal_listeners(80)
+        self.assertTrue(setup_port_forwarding("wlan0", 80, 5353))
+        teardown_port_forwarding("wlan0", 80, 5353); kill_stale_portal_listeners(80)
 
 
 if __name__ == "__main__":
