@@ -43,11 +43,12 @@ sequenceDiagram
     Watchdog->>HTTP: Start HTTP captive portal (:80)
 
     User->>Hotspot: Connects to 'hermes' Wi-Fi (pwd: 12345678)
-    User->>DNS: OS Captive Probe (e.g. captive.apple.com)
+    User->>DNS: OS Captive Probe (e.g. connectivitycheck.gstatic.com or captive.apple.com)
     DNS-->>User: Returns 10.42.0.1
-    User->>HTTP: GET /hotspot-detect.html
+    User->>HTTP: Probe Request (e.g. /generate_204 or /hotspot-detect.html)
     HTTP-->>User: 302 Redirect to http://10.42.0.1/
-    HTTP-->>User: Serves Gluvok Hermes Dark UI Page
+    Note over User: Phone immediately auto-opens Captive Portal sheet!
+    HTTP-->>User: Serves Gluvok Hermes Dark UI Page (accessible at http://hermes.local or http://10.42.0.1)
 
     User->>HTTP: POST /connect {ssid: "Factory_5G", password: "secret"}
     HTTP->>NM: nmcli device wifi connect "Factory_5G"

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import http.server
 import json
+from urllib.parse import urlsplit
 
 from wifi_nmcli.core.constants import TEMPLATES_DIR
 from wifi_nmcli.core.vault import list_saved_networks, save_network
@@ -10,27 +11,28 @@ from wifi_nmcli.nmcli.connection import connect_wifi, get_active_wifi_ssid
 from wifi_nmcli.nmcli.hotspot import is_hotspot_active
 from wifi_nmcli.nmcli.scanner import scan_networks
 
-_PROBE_PATHS = {"/hotspot-detect.html", "/canonicalizer.ucs.ed.ac.uk", "/generate_204", "/gen_204", "/connecttest.txt", "/ncsi.txt"}
+_PROBES = {"/generate_204", "/gen_204", "/hotspot-detect.html", "/canonicalizer.ucs.ed.ac.uk", "/connecttest.txt", "/ncsi.txt"}
+_LOCAL_HOSTS = {"10.42.0.1", "hermes.local", "localhost", "127.0.0.1"}
 
 
 class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None: pass
 
     def do_GET(self) -> None:
-        if self.path in _PROBE_PATHS:
-            self.send_response(302); self.send_header("Location", "http://10.42.0.1/"); self.end_headers(); return
-        if self.path == "/networks":
-            self._send_json(scan_networks()); return
-        if self.path == "/saved":
-            self._send_json(list_saved_networks()); return
-        if self.path == "/status":
-            self._send_json({"hotspot": is_hotspot_active(), "active_ssid": get_active_wifi_ssid()}); return
+        path = urlsplit(self.path).path
+        host = self.headers.get("Host", "").split(":")[0].strip().lower()
+        if path not in {"/networks", "/saved", "/status"} and (path in _PROBES or (host and host not in _LOCAL_HOSTS)):
+            self.send_response(302); self.send_header("Location", "http://10.42.0.1/"); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if path == "/networks": self._send_json(scan_networks()); return
+        if path == "/saved": self._send_json(list_saved_networks()); return
+        if path == "/status": self._send_json({"hotspot": is_hotspot_active(), "active_ssid": get_active_wifi_ssid()}); return
         html = (TEMPLATES_DIR / "index.html").read_text(encoding="utf-8")
         self.send_response(200); self.send_header("Content-Type", "text/html"); self.send_header("Cache-Control", "no-cache"); self.end_headers()
         self.wfile.write(html.encode("utf-8"))
 
     def do_POST(self) -> None:
-        if self.path == "/connect":
+        path = urlsplit(self.path).path
+        if path == "/connect":
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
             ssid, pwd = payload.get("ssid", "").strip(), payload.get("password") or payload.get("passphrase", "")

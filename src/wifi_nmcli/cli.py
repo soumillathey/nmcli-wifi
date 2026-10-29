@@ -9,7 +9,7 @@ import time
 
 from wifi_nmcli.core.constants import DEFAULT_HOTSPOT_PASS, DEFAULT_HOTSPOT_SSID
 from wifi_nmcli.nmcli import connect_wifi, scan_networks, start_hotspot, stop_hotspot
-from wifi_nmcli.portal import portal_service
+from wifi_nmcli.portal import ensure_local_domain, portal_service
 from wifi_nmcli.watchdog import is_network_connected, start_wifi_watchdog, stop_wifi_watchdog
 
 
@@ -38,13 +38,14 @@ def main() -> None:
         return
 
     signal.signal(signal.SIGINT, _shutdown); signal.signal(signal.SIGTERM, _shutdown)
+    ensure_local_domain("hermes.local")
     ssid, pwd = args.ssid or DEFAULT_HOTSPOT_SSID, args.password or DEFAULT_HOTSPOT_PASS
 
     if args.hotspot or not is_network_connected():
         print(f"[WiFi Setup] Initiating emergency hotspot '{ssid}'...")
         if start_hotspot(ssid, pwd):
             portal_service.start()
-            print(f"[WiFi Setup] Hotspot active (SSID: {ssid}, Password: {pwd}) at http://10.42.0.1/")
+            print(f"[WiFi Setup] Hotspot active (SSID: {ssid}, Password: {pwd}) at http://hermes.local or http://10.42.0.1")
 
     start_wifi_watchdog()
     print("[WiFi Setup] Watchdog active. Monitoring connectivity...")

@@ -12,26 +12,32 @@ from wifi_nmcli.portal.redirect import kill_stale_portal_listeners, setup_port_f
 logger = logging.getLogger(__name__)
 
 
+class PortalThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 class CaptiveHTTPServer:
     """Threaded HTTP server serving mobile Wi-Fi portal with port 80 self-healing."""
 
     def __init__(self, port: int = DEFAULT_PORTAL_PORT, iface: str = "wlan0") -> None:
         self.port, self.iface = port, iface
-        self._server: http.server.ThreadingHTTPServer | None = None
+        self._server: PortalThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._redirected = False
 
     def start(self) -> bool:
         if self._server: return True
-        for attempt in range(2):
+        kill_stale_portal_listeners(self.port)
+        for _ in range(2):
             try:
-                self._server = http.server.ThreadingHTTPServer(("0.0.0.0", self.port), CaptivePortalHandler)
+                self._server = PortalThreadingHTTPServer(("0.0.0.0", self.port), CaptivePortalHandler)
                 break
             except (OSError, PermissionError):
-                if attempt == 0: kill_stale_portal_listeners(self.port)
+                kill_stale_portal_listeners(self.port)
         if not self._server:
             try:
-                self._server = http.server.ThreadingHTTPServer(("0.0.0.0", 8080), CaptivePortalHandler)
+                self._server = PortalThreadingHTTPServer(("0.0.0.0", 8080), CaptivePortalHandler)
                 self.port = 8080
                 self._redirected = setup_port_forwarding(self.iface, 80, 8080)
             except (OSError, PermissionError) as e:
@@ -46,7 +52,6 @@ class CaptiveHTTPServer:
         if self._redirected:
             teardown_port_forwarding(self.iface, 80, 8080); self._redirected = False
         if self._server:
-            try:
-                self._server.shutdown(); self._server.server_close()
+            try: self._server.shutdown(); self._server.server_close()
             except OSError: pass
             self._server = None
