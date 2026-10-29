@@ -5,12 +5,7 @@ import logging
 
 from wifi_nmcli.core.constants import DEFAULT_CONNECT_TIMEOUT
 from wifi_nmcli.nmcli.activity import suspend_watchdog
-from wifi_nmcli.nmcli.runner import (
-    SIMULATION_STATE,
-    get_wifi_interface,
-    is_nmcli_available,
-    run_nmcli,
-)
+from wifi_nmcli.nmcli.runner import SIMULATION_STATE, get_wifi_interface, is_nmcli_available, run_nmcli
 
 logger = logging.getLogger(__name__)
 
@@ -29,21 +24,27 @@ def get_active_wifi_ssid() -> str | None:
 
 
 def connect_wifi(ssid: str, password: str, iface: str | None = None, timeout: float = DEFAULT_CONNECT_TIMEOUT) -> tuple[bool, str]:
-    """Connect to a Wi-Fi access point with watchdog suspension."""
+    """Connect to a Wi-Fi access point, self-healing broken profiles."""
     if not ssid or not ssid.strip(): return False, "SSID cannot be empty."
     clean_ssid = ssid.strip()
-    suspend_watchdog(15.0)
+    suspend_watchdog(20.0)
     if not is_nmcli_available() or SIMULATION_STATE["enabled"]:
-        SIMULATION_STATE["active_ssid"] = clean_ssid
-        SIMULATION_STATE["hotspot_active"] = False
+        SIMULATION_STATE["active_ssid"], SIMULATION_STATE["hotspot_active"] = clean_ssid, False
         return True, f"Connected to '{clean_ssid}' (simulated)."
 
     interface = iface or get_wifi_interface()
-    args = ["device", "wifi", "connect", clean_ssid, "ifname", interface]
-    if password: args += ["password", password]
-
+    run_nmcli(["connection", "delete", clean_ssid])
+    args = ["device", "wifi", "connect", clean_ssid, "ifname", interface] + (["password", password] if password else [])
     logger.info("Attempting nmcli connection to SSID '%s' on %s", clean_ssid, interface)
     code, out = run_nmcli(args, timeout=timeout)
+
+    if code != 0 and password:
+        logger.info("Retrying with explicit wpa-psk profile for '%s'...", clean_ssid)
+        run_nmcli(["connection", "delete", clean_ssid])
+        run_nmcli(["connection", "add", "type", "wifi", "ifname", interface, "con-name", clean_ssid, "ssid", clean_ssid])
+        run_nmcli(["connection", "modify", clean_ssid, "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", password])
+        code, out = run_nmcli(["connection", "up", clean_ssid], timeout=timeout)
+
     suspend_watchdog(15.0)
     if code == 0: return True, f"Successfully connected to Wi-Fi: '{clean_ssid}'."
     return False, f"nmcli error ({code}): {out or 'Connection failed'}"
