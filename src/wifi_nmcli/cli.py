@@ -7,11 +7,9 @@ import sys
 import time
 
 from wifi_nmcli.core.constants import DEFAULT_HOTSPOT_PASS, DEFAULT_HOTSPOT_SSID
-from wifi_nmcli.nmcli.connection import connect_wifi
-from wifi_nmcli.nmcli.hotspot import start_hotspot, stop_hotspot
-from wifi_nmcli.nmcli.scanner import scan_networks
-from wifi_nmcli.portal.service import portal_service
-from wifi_nmcli.watchdog.monitor import start_wifi_watchdog, stop_wifi_watchdog
+from wifi_nmcli.nmcli import connect_wifi, scan_networks, start_hotspot, stop_hotspot
+from wifi_nmcli.portal import portal_service
+from wifi_nmcli.watchdog import start_wifi_watchdog, stop_wifi_watchdog
 
 
 def _shutdown(signum: int = 0, frame: object = None) -> None:
