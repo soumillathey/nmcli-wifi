@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from wifi_nmcli.core.constants import DEFAULT_HOTSPOT_PASS, DEFAULT_HOTSPOT_SSID, HOTSPOT_CON_NAME
+from wifi_nmcli.nmcli.activity import suspend_watchdog
 from wifi_nmcli.nmcli.ip import get_hotspot_ip
 from wifi_nmcli.nmcli.runner import SIMULATION_STATE, get_wifi_interface, is_nmcli_available, run_nmcli
 
@@ -19,7 +20,8 @@ def is_hotspot_active(con_name: str = HOTSPOT_CON_NAME) -> bool:
 
 
 def start_hotspot(ssid: str = DEFAULT_HOTSPOT_SSID, password: str = DEFAULT_HOTSPOT_PASS, iface: str | None = None, con_name: str = HOTSPOT_CON_NAME) -> bool:
-    """Initiates an Access Point (Hotspot) on the wireless interface."""
+    """Initiates an Access Point (Hotspot) with watchdog suspension."""
+    suspend_watchdog(10.0)
     if is_hotspot_active(con_name): return True
     if not is_nmcli_available() or SIMULATION_STATE["enabled"]:
         SIMULATION_STATE["hotspot_active"] = True
@@ -32,12 +34,14 @@ def start_hotspot(ssid: str = DEFAULT_HOTSPOT_SSID, password: str = DEFAULT_HOTS
         run_nmcli(["connection", "add", "type", "wifi", "ifname", interface, "con-name", con_name, "autoconnect", "no", "ssid", ssid])
         run_nmcli(["connection", "modify", con_name, "802-11-wireless.mode", "ap", "ipv4.method", "shared", "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", password])
         code, out = run_nmcli(["connection", "up", con_name])
+    suspend_watchdog(10.0)
     logger.info("Hotspot '%s' activation returned code %d: %s", ssid, code, out)
     return code == 0
 
 
 def stop_hotspot(con_name: str = HOTSPOT_CON_NAME) -> bool:
     """Tears down the emergency hotspot connection."""
+    suspend_watchdog(10.0)
     if not is_nmcli_available() or SIMULATION_STATE["enabled"]:
         SIMULATION_STATE["hotspot_active"] = False
         return True

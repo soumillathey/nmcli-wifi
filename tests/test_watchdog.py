@@ -4,6 +4,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+from wifi_nmcli.nmcli import is_nmcli_busy, is_watchdog_suspended, suspend_watchdog
 from wifi_nmcli.nmcli.runner import SIMULATION_STATE
 from wifi_nmcli.watchdog import _handle_status, start_wifi_watchdog, stop_wifi_watchdog
 from wifi_nmcli.watchdog.connectivity import is_network_connected
@@ -29,19 +30,16 @@ class TestWatchdog(unittest.TestCase):
         SIMULATION_STATE["enabled"] = False
         self.assertFalse(is_network_connected())
 
+    def test_suspension_mechanism(self) -> None:
+        self.assertFalse(is_nmcli_busy())
+        suspend_watchdog(10.0)
+        self.assertTrue(is_watchdog_suspended())
+
     def test_debounced_status_handling(self) -> None:
-        # 1st failure below threshold=2 should return 1
-        failures = _handle_status(online=False, failures=0, threshold=2)
-        self.assertEqual(failures, 1)
-
-        # 2nd failure reaches threshold, should trigger hotspot and reset failures to 0
-        failures = _handle_status(online=False, failures=1, threshold=2)
-        self.assertEqual(failures, 0)
+        self.assertEqual(_handle_status(online=False, failures=0, threshold=2), 1)
+        self.assertEqual(_handle_status(online=False, failures=1, threshold=2), 0)
         self.assertTrue(SIMULATION_STATE["hotspot_active"])
-
-        # Online recovery should reset failures to 0 and disable hotspot
-        failures = _handle_status(online=True, failures=5, threshold=2)
-        self.assertEqual(failures, 0)
+        self.assertEqual(_handle_status(online=True, failures=5, threshold=2), 0)
         self.assertFalse(SIMULATION_STATE["hotspot_active"])
 
     def test_watchdog_thread_lifecycle(self) -> None:
