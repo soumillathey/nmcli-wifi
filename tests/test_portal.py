@@ -5,10 +5,12 @@ import json
 import socket
 import unittest
 import urllib.request
+from unittest.mock import patch
 
 from wifi_nmcli.nmcli.runner import SIMULATION_STATE
 from wifi_nmcli.portal.dns_server import _build_response
 from wifi_nmcli.portal.http_server import CaptiveHTTPServer
+from wifi_nmcli.portal.redirect import kill_stale_portal_listeners, setup_port_forwarding, teardown_port_forwarding
 from wifi_nmcli.portal.service import portal_service
 
 
@@ -29,20 +31,17 @@ class TestCaptivePortal(unittest.TestCase):
             base_url = f"http://127.0.0.1:{http_srv.port}"
             with urllib.request.urlopen(f"{base_url}/", timeout=3.0) as r:
                 self.assertEqual(r.status, 200)
-                html = r.read().decode("utf-8")
-                self.assertIn("Gluvok Hermes", html)
+                self.assertIn("Gluvok Hermes", r.read().decode("utf-8"))
 
             with urllib.request.urlopen(f"{base_url}/networks", timeout=3.0) as r:
                 self.assertEqual(r.status, 200)
-                data = json.loads(r.read().decode("utf-8"))
-                self.assertIsInstance(data, list)
+                self.assertIsInstance(json.loads(r.read().decode("utf-8")), list)
 
             payload = json.dumps({"ssid": "OfficePortalTest", "password": "pass"}).encode("utf-8")
             req = urllib.request.Request(f"{base_url}/connect", data=payload, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=3.0) as r:
                 self.assertEqual(r.status, 200)
-                resp_json = json.loads(r.read().decode("utf-8"))
-                self.assertTrue(resp_json["success"])
+                self.assertTrue(json.loads(r.read().decode("utf-8"))["success"])
         finally:
             http_srv.stop()
 
@@ -52,6 +51,13 @@ class TestCaptivePortal(unittest.TestCase):
         self.assertTrue(portal_service.is_running())
         portal_service.stop()
         self.assertFalse(portal_service.is_running())
+
+    @patch("shutil.which", return_value="/sbin/iptables")
+    @patch("wifi_nmcli.portal.redirect._run_cmd", return_value=True)
+    def test_redirect_utilities(self, mock_cmd: patch, mock_which: patch) -> None:
+        self.assertTrue(setup_port_forwarding("wlan0", 80, 8080))
+        teardown_port_forwarding("wlan0", 80, 8080)
+        kill_stale_portal_listeners(80)
 
 
 if __name__ == "__main__":
