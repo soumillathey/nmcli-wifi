@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import signal
 import sys
 import time
@@ -9,18 +10,16 @@ import time
 from wifi_nmcli.core.constants import DEFAULT_HOTSPOT_PASS, DEFAULT_HOTSPOT_SSID
 from wifi_nmcli.nmcli import connect_wifi, scan_networks, start_hotspot, stop_hotspot
 from wifi_nmcli.portal import portal_service
-from wifi_nmcli.watchdog import start_wifi_watchdog, stop_wifi_watchdog
+from wifi_nmcli.watchdog import is_network_connected, start_wifi_watchdog, stop_wifi_watchdog
 
 
 def _shutdown(signum: int = 0, frame: object = None) -> None:
     print("\n[WiFi Setup] Shutting down watchdog and captive portal...")
-    stop_wifi_watchdog()
-    portal_service.stop()
-    stop_hotspot()
-    sys.exit(0)
+    stop_wifi_watchdog(); portal_service.stop(); stop_hotspot(); sys.exit(0)
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
     p = argparse.ArgumentParser(description="Hermes nmcli Wi-Fi Setup & Watchdog")
     p.add_argument("--scan", action="store_true", help="Scan nearby Wi-Fi networks")
     p.add_argument("--connect", action="store_true", help="Connect to specified Wi-Fi")
@@ -34,23 +33,21 @@ def main() -> None:
             print(f"- {net['ssid']} ({net.get('signal', 0)}%) [{net.get('security', 'Open')}]")
         return
     if args.connect:
-        ssid = args.ssid or input("SSID: ")
-        pwd = args.password or input("Password: ")
-        ok, msg = connect_wifi(ssid, pwd)
+        ok, msg = connect_wifi(args.ssid or input("SSID: "), args.password or input("Password: "))
         print(f"[{'SUCCESS' if ok else 'FAILED'}] {msg}")
         return
 
-    signal.signal(signal.SIGINT, _shutdown)
-    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown); signal.signal(signal.SIGTERM, _shutdown)
+    ssid, pwd = args.ssid or DEFAULT_HOTSPOT_SSID, args.password or DEFAULT_HOTSPOT_PASS
 
-    if args.hotspot:
-        start_hotspot(args.ssid or DEFAULT_HOTSPOT_SSID, args.password or DEFAULT_HOTSPOT_PASS)
-        portal_service.start()
-        print(f"[WiFi Setup] Hotspot active (SSID: {args.ssid or DEFAULT_HOTSPOT_SSID}). Press Ctrl+C to stop.")
+    if args.hotspot or not is_network_connected():
+        print(f"[WiFi Setup] Initiating emergency hotspot '{ssid}'...")
+        if start_hotspot(ssid, pwd):
+            portal_service.start()
+            print(f"[WiFi Setup] Hotspot active (SSID: {ssid}, Password: {pwd}) at http://10.42.0.1/")
 
     start_wifi_watchdog()
-    print("[WiFi Setup] Watchdog active. Monitoring Wi-Fi connectivity...")
+    print("[WiFi Setup] Watchdog active. Monitoring connectivity...")
     try:
         while True: time.sleep(1)
-    except KeyboardInterrupt:
-        _shutdown()
+    except KeyboardInterrupt: _shutdown()

@@ -31,7 +31,7 @@ def is_nmcli_busy() -> bool:
 
 
 @contextlib.contextmanager
-def nmcli_lock(cooldown: float = 10.0) -> Iterator[None]:
+def nmcli_lock(cooldown: float = 0.0) -> Iterator[None]:
     """Serialized context manager ensuring no concurrent nmcli collisions."""
     with _lock:
         _busy_event.set()
@@ -39,4 +39,5 @@ def nmcli_lock(cooldown: float = 10.0) -> Iterator[None]:
             yield
         finally:
             _busy_event.clear()
-            suspend_watchdog(cooldown)
+            if cooldown > 0:
+                suspend_watchdog(cooldown)
