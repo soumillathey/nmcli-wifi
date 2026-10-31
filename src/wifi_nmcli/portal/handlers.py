@@ -22,6 +22,10 @@ class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
         host = self.headers.get("Host", "").split(":")[0].strip().lower()
+        if path == "/.well-known/captive-portal":
+            payload = {"captive": True, "user-portal-url": "http://10.42.0.1/"}
+            self.send_response(200); self.send_header("Content-Type", "application/captive+json"); self.send_header("Cache-Control", "no-store"); self.end_headers()
+            self.wfile.write(json.dumps(payload).encode("utf-8")); return
         if path not in {"/networks", "/saved", "/status"} and (path in _PROBES or (host and host not in _LOCAL_HOSTS)):
             self.send_response(302); self.send_header("Location", "http://10.42.0.1/"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/networks": self._send_json(scan_networks()); return

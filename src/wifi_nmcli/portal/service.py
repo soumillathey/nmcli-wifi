@@ -4,7 +4,9 @@ from __future__ import annotations
 import logging
 
 from wifi_nmcli.core.constants import DEFAULT_DNS_PORT, DEFAULT_GATEWAY_IP, DEFAULT_PORTAL_PORT
+from wifi_nmcli.portal.capport import setup_nm_capport_config, teardown_nm_capport_config
 from wifi_nmcli.portal.dns_server import CaptiveDNSServer
+from wifi_nmcli.portal.hosts import ensure_local_domain
 from wifi_nmcli.portal.http_server import CaptiveHTTPServer
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,8 @@ class PortalService:
 
     def start(self, ip: str = DEFAULT_GATEWAY_IP, http_port: int = DEFAULT_PORTAL_PORT, dns_port: int = DEFAULT_DNS_PORT, iface: str = "wlan0") -> bool:
         if self._active: return True
+        ensure_local_domain("hermes.local")
+        setup_nm_capport_config(ip)
         self._dns = CaptiveDNSServer(ip=ip, port=dns_port)
         self._http = CaptiveHTTPServer(port=http_port, iface=iface)
         dns_ok, http_ok = self._dns.start(), self._http.start()
@@ -29,6 +33,7 @@ class PortalService:
         return self._active
 
     def stop(self) -> None:
+        teardown_nm_capport_config()
         if self._dns: self._dns.stop(); self._dns = None
         if self._http: self._http.stop(); self._http = None
         self._active = False
